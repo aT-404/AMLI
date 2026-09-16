@@ -1,16 +1,16 @@
 export const navData = {
 	items: [
-		// {
-		// 	name: 'Home',
-		// 	items: [
-		// 		{
-		// 			name: 'Home',
-		// 			fa_icon: 'fa-solid fa-house',
-		// 			href: '/'
-		// 		},
-		// 		{ name: 'Quick start', fa_icon: 'fa-solid fa-plane', href: '/quick-start' }
-		// 	]
-		// },
+		{
+			name: 'home',
+			items: [
+				{
+					name: 'home',
+					fa_icon: 'fa-solid fa-house',
+					href: '/'
+				},
+				{ name: 'quickStart', fa_icon: 'fa-solid fa-plane', href: '/quick-start' }
+			]
+		},
 		{
 			name: 'overview',
 			items: [

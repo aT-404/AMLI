@@ -29,7 +29,7 @@
                         parent_key: category.name,
                         enabled_for_web_admin: true,
                         enabled_for_admin: true,
-                        enabled_for_user: false
+                        enabled_for_user: true
                     };
                 }
             });

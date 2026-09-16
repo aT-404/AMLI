@@ -245,7 +245,7 @@ class CurrentUserView(views.APIView):
             all_keys = list(FeatureToggle.objects.values_list("key", flat=True))
             if not all_keys:
                 all_keys = [
-                    "users", "logs", "features", "accessRights", "riskAssessments", "complianceAssessments",
+                    "home", "quickStart", "users", "logs", "features", "accessRights", "riskAssessments", "complianceAssessments",
                     "vulnerabilities", "incidents", "ebiosRM", "quantitativeRiskStudies",
                     "processingsRegister", "tprmOverview", "analytics", "reports",
                     "companyHierarchy", "frameworks", "threats", "securityAdvisories",
