@@ -259,6 +259,30 @@ class IntermediaryFolderViewSet(viewsets.ModelViewSet):
 
         return IntermediaryFolder.objects.all()
 
+    def create(self, request, *args, **kwargs):
+        if not is_user_admin(request.user):
+            return Response(
+                {"error": "Permission denied. Only admins can create folders or modify repository structure."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().create(request, *args, **kwargs)
+
+    def update(self, request, *args, **kwargs):
+        if not is_user_admin(request.user):
+            return Response(
+                {"error": "Permission denied. Only admins can modify folders or repository structure."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().update(request, *args, **kwargs)
+
+    def destroy(self, request, *args, **kwargs):
+        if not is_user_admin(request.user):
+            return Response(
+                {"error": "Permission denied. Only admins can delete folders or repository structure."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().destroy(request, *args, **kwargs)
+
     @action(detail=False, methods=["get"], url_path="tree")
     def repository_tree(self, request):
         root = IntermediaryFolder.get_root_repository()

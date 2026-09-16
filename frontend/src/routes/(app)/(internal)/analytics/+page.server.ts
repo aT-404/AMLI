@@ -286,10 +286,27 @@ export const load: PageServerLoad = async ({ locals, fetch, url }) => {
 			return null;
 		});
 
+	const userKpisPromise = fetch(`${BASE_API_URL}/get_user_kpis/`)
+		.then(assertOk)
+		.then((res) => res.json())
+		.then((data) => data.results)
+		.catch((error) => {
+			console.error('Failed to fetch user KPIs:', error);
+			return {
+				pending_tasks: 0,
+				overdue_controls: 0,
+				pending_reviews: 0,
+				intermediary_domains: 0,
+				can_access_defaulters: false,
+				can_access_reviews: false
+			};
+		});
+
 	return {
 		user: locals.user,
 		title: m.analytics(),
 		stream: {
+			userKpis: userKpisPromise,
 			metrics: metricsPromise,
 			auditsMetrics: auditsMetricsPromise,
 			counters: countersPromise,

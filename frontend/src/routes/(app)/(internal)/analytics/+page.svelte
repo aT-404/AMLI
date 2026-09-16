@@ -191,6 +191,7 @@
 		<Tabs.Trigger value="governance">{m.governance()}</Tabs.Trigger>
 		<Tabs.Trigger value="risk">{m.risk()}</Tabs.Trigger>
 		<Tabs.Trigger value="compliance">{m.compliance()}</Tabs.Trigger>
+		<Tabs.Trigger value="intermediary">Intermediary Compliance</Tabs.Trigger>
 		<Tabs.Trigger value="operations">{m.operations()}</Tabs.Trigger>
 		<Tabs.Trigger value="custom">{m.custom()}</Tabs.Trigger>
 		<Tabs.Indicator />
@@ -198,6 +199,91 @@
 	{#key group}
 		<div class="px-4 pb-4 space-y-8">
 			<Tabs.Content value="summary">
+				<!-- Actionable KPI Summary Bar -->
+				{#await data.stream.userKpis}
+					<div class="p-4 bg-surface-100-900 rounded-xl border border-surface-200-800 text-xs mb-6">Loading role-aware KPIs...</div>
+				{:then kpis}
+					{#if kpis}
+						<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+							<a
+								href="/task-templates"
+								class="card p-4 flex items-center justify-between border border-surface-200-800 hover:border-primary-500 transition-all shadow-xs"
+							>
+								<div>
+									<span class="text-xs font-semibold text-surface-500 uppercase tracking-wider block">Pending Tasks</span>
+									<span class="text-2xl font-extrabold text-surface-900-100 mt-1 block">{kpis.pending_tasks}</span>
+								</div>
+								<div class="w-10 h-10 rounded-full bg-primary-500/10 text-primary-500 flex items-center justify-center text-lg">
+									<i class="fa-solid fa-list-check"></i>
+								</div>
+							</a>
+
+							{#if kpis.can_access_defaulters}
+								<a
+									href="/defaulters-tracker"
+									class="card p-4 flex items-center justify-between border border-surface-200-800 hover:border-error-500 transition-all shadow-xs"
+								>
+									<div>
+										<span class="text-xs font-semibold text-surface-500 uppercase tracking-wider block">Overdue Controls</span>
+										<span class="text-2xl font-extrabold text-error-500 mt-1 block">{kpis.overdue_controls}</span>
+									</div>
+									<div class="w-10 h-10 rounded-full bg-error-500/10 text-error-500 flex items-center justify-center text-lg">
+										<i class="fa-solid fa-clock-rotate-left"></i>
+									</div>
+								</a>
+							{:else}
+								<div class="card p-4 flex items-center justify-between border border-surface-200-800 shadow-xs opacity-80">
+									<div>
+										<span class="text-xs font-semibold text-surface-500 uppercase tracking-wider block">Overdue Controls</span>
+										<span class="text-2xl font-extrabold text-surface-900-100 mt-1 block">{kpis.overdue_controls}</span>
+									</div>
+									<div class="w-10 h-10 rounded-full bg-surface-200-800 text-surface-400 flex items-center justify-center text-lg">
+										<i class="fa-solid fa-clock-rotate-left"></i>
+									</div>
+								</div>
+							{/if}
+
+							{#if kpis.can_access_reviews}
+								<a
+									href="/control-assignments/review"
+									class="card p-4 flex items-center justify-between border border-surface-200-800 hover:border-amber-500 transition-all shadow-xs"
+								>
+									<div>
+										<span class="text-xs font-semibold text-surface-500 uppercase tracking-wider block">Pending Reviews</span>
+										<span class="text-2xl font-extrabold text-amber-500 mt-1 block">{kpis.pending_reviews}</span>
+									</div>
+									<div class="w-10 h-10 rounded-full bg-amber-500/10 text-amber-500 flex items-center justify-center text-lg">
+										<i class="fa-solid fa-file-signature"></i>
+									</div>
+								</a>
+							{:else}
+								<div class="card p-4 flex items-center justify-between border border-surface-200-800 shadow-xs opacity-80">
+									<div>
+										<span class="text-xs font-semibold text-surface-500 uppercase tracking-wider block">Pending Reviews</span>
+										<span class="text-2xl font-extrabold text-surface-900-100 mt-1 block">{kpis.pending_reviews}</span>
+									</div>
+									<div class="w-10 h-10 rounded-full bg-surface-200-800 text-surface-400 flex items-center justify-center text-lg">
+										<i class="fa-solid fa-file-signature"></i>
+									</div>
+								</div>
+							{/if}
+
+							<a
+								href="/intermediary-compliance/assignments"
+								class="card p-4 flex items-center justify-between border border-surface-200-800 hover:border-tertiary-500 transition-all shadow-xs"
+							>
+								<div>
+									<span class="text-xs font-semibold text-surface-500 uppercase tracking-wider block">Assigned Business Functions</span>
+									<span class="text-2xl font-extrabold text-surface-900-100 mt-1 block">{kpis.intermediary_domains}</span>
+								</div>
+								<div class="w-10 h-10 rounded-full bg-tertiary-500/10 text-tertiary-500 flex items-center justify-center text-lg">
+									<i class="fa-solid fa-building-user"></i>
+								</div>
+							</a>
+						</div>
+					{/if}
+				{/await}
+
 				{#await data.stream.metrics}
 					<div class="col-span-3 lg:col-span-1">
 						<div>Refreshing data ..</div>
@@ -1259,6 +1345,61 @@
 						</div>
 					</div>
 				{/await}
+			</Tabs.Content>
+			<Tabs.Content value="intermediary">
+				<section id="intermediary-analytics" class="space-y-6">
+					<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-surface-50-950 border border-surface-200-800 shadow-xs">
+						<div>
+							<h3 class="text-lg font-bold text-surface-900-100 flex items-center gap-2">
+								<i class="fa-solid fa-building-user text-tertiary-500"></i>
+								<span>Intermediary Compliance Overview</span>
+							</h3>
+							<p class="text-xs text-surface-500 mt-1">
+								Monitor business function domain assignments, partner questionnaire completion, and report repository status for your scope.
+							</p>
+						</div>
+						<a
+							href="/intermediary-compliance/assignments"
+							class="px-4 py-2 rounded-xl bg-tertiary-500 hover:bg-tertiary-600 text-white font-semibold text-xs transition-all shadow-xs flex items-center gap-2 shrink-0 self-start sm:self-auto cursor-pointer"
+						>
+							<i class="fa-solid fa-arrow-up-right-from-square"></i>
+							<span>View Assignments</span>
+						</a>
+					</div>
+
+					{#await data.stream.userKpis}
+						<LoadingSpinner />
+					{:then kpis}
+						<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+							<div class="card p-6 border border-surface-200-800 space-y-3 bg-surface-50-950 shadow-xs">
+								<div class="flex items-center justify-between">
+									<span class="text-xs font-semibold text-surface-500 uppercase tracking-wider">Assigned Functions</span>
+									<i class="fa-solid fa-sitemap text-primary-500 text-lg"></i>
+								</div>
+								<div class="text-3xl font-extrabold text-primary-500">{kpis?.intermediary_domains || 0}</div>
+								<p class="text-xs text-surface-400">Business function domains assigned to your account or scope.</p>
+							</div>
+
+							<div class="card p-6 border border-surface-200-800 space-y-3 bg-surface-50-950 shadow-xs">
+								<div class="flex items-center justify-between">
+									<span class="text-xs font-semibold text-surface-500 uppercase tracking-wider">Report Repository</span>
+									<i class="fa-solid fa-folder-tree text-emerald-500 text-lg"></i>
+								</div>
+								<div class="text-3xl font-extrabold text-emerald-500">Available</div>
+								<p class="text-xs text-surface-400">Authorized access to central compliance report files.</p>
+							</div>
+
+							<div class="card p-6 border border-surface-200-800 space-y-3 bg-surface-50-950 shadow-xs">
+								<div class="flex items-center justify-between">
+									<span class="text-xs font-semibold text-surface-500 uppercase tracking-wider">Intermediary Status</span>
+									<i class="fa-solid fa-chart-pie text-amber-500 text-lg"></i>
+								</div>
+								<div class="text-3xl font-extrabold text-amber-500">Active</div>
+								<p class="text-xs text-surface-400">Real-time tracking of partner compliance workflows.</p>
+							</div>
+						</div>
+					{/await}
+				</section>
 			</Tabs.Content>
 			<Tabs.Content value="custom">
 				{#await Promise.all([data.stream.dashboardsList, data.stream.customDashboard])}

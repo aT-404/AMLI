@@ -1,17 +1,17 @@
 import { BASE_API_URL } from '$lib/utils/constants';
 import type { PageServerLoad, Actions } from './$types';
 
-export const load: PageServerLoad = async ({ fetch }) => {
+export const load: PageServerLoad = async ({ fetch, locals }) => {
 	try {
 		const res = await fetch(`${BASE_API_URL}/intermediary-compliance/repository/tree/`);
 		if (res.ok) {
 			const treeData = await res.json();
-			return { treeData };
+			return { treeData, currentUser: locals.user || null };
 		}
 	} catch (err) {
 		console.error('Failed to load intermediary compliance repository tree:', err);
 	}
-	return { treeData: null };
+	return { treeData: null, currentUser: locals.user || null };
 };
 
 export const actions: Actions = {

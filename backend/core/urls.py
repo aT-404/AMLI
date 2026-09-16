@@ -273,6 +273,7 @@ urlpatterns = [
     path(
         "get_audits_metrics/", get_audits_metrics_view, name="get_audits_metrics_view"
     ),
+    path("get_user_kpis/", get_user_kpis_view, name="get_user_kpis_view"),
     path(
         "get_combined_assessments_status/",
         get_combined_assessments_status_view,

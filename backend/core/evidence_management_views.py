@@ -229,6 +229,20 @@ class EvidenceReviewActionView(APIView):
         if not link:
             return Response({"error": "Evidence link not found."}, status=status.HTTP_404_NOT_FOUND)
 
+        # Server-side Authorization Enforcement for Evidence Review
+        assignment = link.control_evidence_mapping.control_assignment if link.control_evidence_mapping else (
+            link.assessment_control.control_assignment if link.assessment_control else None
+        )
+        is_reviewer = bool(assignment and assignment.reviewer_user and assignment.reviewer_user == user)
+        is_admin_or_higher = bool(
+            getattr(user, "is_superuser", False) or getattr(user, "platform_role", "") in ["superadmin", "webadmin", "admin"] or getattr(user, "is_admin", False)
+        )
+        if not (is_admin_or_higher or is_reviewer):
+            return Response(
+                {"error": "Permission denied. Only authorized reviewers can perform evidence review."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
         # Safe Optimistic Locking Check (BS-17)
         if version is not None:
             try:

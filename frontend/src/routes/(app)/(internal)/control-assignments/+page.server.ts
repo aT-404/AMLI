@@ -4,15 +4,14 @@ import { redirect } from '@sveltejs/kit';
 
 export const load: PageServerLoad = async ({ fetch, url, locals }) => {
 	const user = locals.user;
-	const isAdminUser = Boolean(
+	const isSuperOrWebAdmin = Boolean(
 		user?.is_superuser ||
 		user?.platform_role === 'superadmin' ||
-		user?.platform_role === 'webadmin' ||
-		user?.platform_role === 'admin'
+		user?.platform_role === 'webadmin'
 	);
 
-	// Off limits for standard User accounts! Redirect to SPOC Submission page
-	if (!isAdminUser) {
+	// Off limits for standard User and Admin accounts! Only webadmin & superadmin can manage control assignments
+	if (!isSuperOrWebAdmin) {
 		throw redirect(303, '/control-assignments/submit');
 	}
 

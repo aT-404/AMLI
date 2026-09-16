@@ -625,7 +625,7 @@ REST_FRAMEWORK = {
         "rest_framework.renderers.JSONRenderer",
     ],
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "core.permissions.CookieTokenAuthentication",
+        "iam.authentication.CookieTokenAuthentication",
         "knox.auth.TokenAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [

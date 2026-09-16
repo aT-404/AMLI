@@ -15,19 +15,32 @@
 
 	let items = $derived.by(() => {
 		const user = page.data?.user;
+		const isSuperOrWebAdmin = Boolean(
+			user?.is_superuser ||
+			user?.platform_role === 'superadmin' ||
+			user?.platform_role === 'webadmin'
+		);
+
 		return navData.items
 			.map((item) => {
-				const filteredSubItems = item.items.filter((subItem) => {
-					// Superadmins and superusers bypass feature toggle restrictions
-					if (user?.platform_role === 'superadmin' || user?.is_superuser) {
+				const filteredSubItems = item.items
+					.filter((subItem) => {
+						// Superadmins and superusers bypass feature toggle restrictions
+						if (user?.platform_role === 'superadmin' || user?.is_superuser) {
+							return true;
+						}
+						// For webadmin, admin, user, etc., check active_features returned from backend Access Matrix
+						if (user?.active_features && Array.isArray(user.active_features)) {
+							return user.active_features.includes(subItem.name);
+						}
 						return true;
-					}
-					// For webadmin, admin, user, etc., check active_features returned from backend Access Matrix
-					if (user?.active_features && Array.isArray(user.active_features)) {
-						return user.active_features.includes(subItem.name);
-					}
-					return true;
-				});
+					})
+					.map((subItem) => {
+						if (subItem.name === 'controlAssignments' && !isSuperOrWebAdmin) {
+							return { ...subItem, href: '/control-assignments/submit' };
+						}
+						return subItem;
+					});
 
 				return {
 					...item,

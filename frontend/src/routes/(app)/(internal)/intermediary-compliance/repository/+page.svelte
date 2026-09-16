@@ -255,6 +255,14 @@
 		return false;
 	}
 
+	const canManageRepository = $derived(
+		Boolean(
+			data.currentUser?.is_superuser ||
+			data.currentUser?.is_admin ||
+			['superadmin', 'webadmin', 'admin'].includes(data.currentUser?.platform_role)
+		)
+	);
+
 	function openReviewModal(report: ReportItem) {
 		reviewErrorMsg = '';
 		isReviewAllowed = isUserAllowedToReview(report);
@@ -508,14 +516,16 @@
 					</div>
 
 					<!-- Folder Specific Actions -->
-					<div class="flex items-center gap-2">
-						<button class="btn btn-sm variant-soft-primary text-xs cursor-pointer" onclick={openNewFolderModal}>
-							<i class="fa-solid fa-folder-plus mr-1"></i> + New Subfolder
-						</button>
-						<button class="btn btn-sm variant-soft-tertiary text-xs cursor-pointer" onclick={openUploadFileModal}>
-							<i class="fa-solid fa-file-circle-plus mr-1"></i> + Add Report File
-						</button>
-					</div>
+					{#if canManageRepository}
+						<div class="flex items-center gap-2">
+							<button class="btn btn-sm variant-soft-primary text-xs cursor-pointer" onclick={openNewFolderModal}>
+								<i class="fa-solid fa-folder-plus mr-1"></i> + New Subfolder
+							</button>
+							<button class="btn btn-sm variant-soft-tertiary text-xs cursor-pointer" onclick={openUploadFileModal}>
+								<i class="fa-solid fa-file-circle-plus mr-1"></i> + Add Report File
+							</button>
+						</div>
+					{/if}
 				</div>
 
 				<!-- Subfolders Section (Enabled in ALL Folders) -->

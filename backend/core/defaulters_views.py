@@ -6,8 +6,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import status
 
-from core.models import ControlAssignment, User
-from core.escalation_engine import is_assignment_cleared, resolve_escalation_recipients, compute_current_escalation_level
+from core.models import ControlAssignment, User, AuditEvidenceLink
+from core.escalation_engine import compute_current_escalation_level
 
 
 class DefaultersTrackerView(APIView):
@@ -18,10 +18,6 @@ class DefaultersTrackerView(APIView):
         today = timezone.now().date()
 
         is_admin = getattr(user, 'is_superuser', False) or getattr(user, 'platform_role', '') in ['superadmin', 'webadmin', 'admin']
-        has_subordinates = user.direct_reports.exists()
-
-        if not (is_admin or has_subordinates):
-            return Response({'error': 'Access denied. Defaulters Tracker is restricted to Supervisors and Administrators.'}, status=status.HTTP_403_FORBIDDEN)
 
         qs = ControlAssignment.objects.filter(
             is_active=True,
@@ -30,6 +26,7 @@ class DefaultersTrackerView(APIView):
 
         if not is_admin:
             subordinate_ids = set(user.direct_reports.values_list('id', flat=True))
+            subordinate_ids.add(user.id)
             qs = qs.filter(spoc_user_id__in=subordinate_ids)
 
         spoc_id = request.query_params.get('spoc_id')
@@ -43,9 +40,27 @@ class DefaultersTrackerView(APIView):
         if level_filter:
             qs = qs.filter(escalation_level=level_filter)
 
+        ca_list = list(qs)
+        ca_ids = [ca.id for ca in ca_list]
+
+        # Batch load active cleared evidence links for instant O(1) in-memory checking
+        cleared_ca_ids = set(
+            AuditEvidenceLink.objects.filter(
+                is_active=True,
+                control_evidence_mapping__control_assignment_id__in=ca_ids,
+                review_status__in=["SUBMITTED", "PENDING_REVIEW", "APPROVED"]
+            ).values_list('control_evidence_mapping__control_assignment_id', flat=True)
+        ) | set(
+            AuditEvidenceLink.objects.filter(
+                is_active=True,
+                assessment_control__control_assignment_id__in=ca_ids,
+                review_status__in=["SUBMITTED", "PENDING_REVIEW", "APPROVED"]
+            ).values_list('assessment_control__control_assignment_id', flat=True)
+        )
+
         results = []
-        for ca in qs:
-            cleared = is_assignment_cleared(ca)
+        for ca in ca_list:
+            cleared = ca.is_not_applicable or (ca.id in cleared_ca_ids)
 
             active_deadline = ca.l3_final_deadline or ca.l2_grace_deadline or ca.due_date
             days_overdue = 0

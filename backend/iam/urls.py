@@ -3,6 +3,7 @@ from django.urls import include, path
 
 from .views import (
     AuthTokenDetailView,
+    LogoutView,
     PersonalAccessTokenViewSet,
     ChangePasswordView,
     CurrentUserView,
@@ -17,7 +18,7 @@ from .views import (
 )
 
 urlpatterns = [
-    path(r"logout/", knox_views.LogoutView.as_view(), name="knox_logout"),
+    path(r"logout/", LogoutView.as_view(), name="knox_logout"),
     path(r"logoutall/", knox_views.LogoutAllView.as_view(), name="knox_logoutall"),
     path("current-user/", CurrentUserView.as_view(), name="current-user"),
     path("change-password/", ChangePasswordView.as_view(), name="change-password"),

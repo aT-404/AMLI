@@ -25,11 +25,17 @@
 		});
 	});
 
-	const user = $derived(data.currentUser);
+	const user = $derived(data?.currentUser);
 	const isSuperOrWebAdmin = $derived(
 		user?.is_superuser ||
 		user?.platform_role === 'superadmin' ||
 		user?.platform_role === 'webadmin'
+	);
+	const canReview = $derived(
+		user?.is_superuser ||
+		user?.platform_role === 'superadmin' ||
+		user?.platform_role === 'webadmin' ||
+		user?.platform_role === 'admin'
 	);
 
 	const filteredControls = $derived(
@@ -52,26 +58,7 @@
 	let uploadMessage = $state('');
 
 	async function loadMyControls() {
-		loading = true;
-		try {
-			const res = await fetch('/api/control-assignments/controls/');
-			if (res.ok) {
-				const resData = await res.json();
-				const list: any[] = [];
-				for (const fw of resData.frameworks || []) {
-					for (const c of fw.controls || []) {
-						if (c.assignment) {
-							list.push({ ...c, framework_name: fw.name, framework_id: fw.id });
-						}
-					}
-				}
-				myControls = list;
-			}
-		} catch (err) {
-			console.error('Failed to load SPOC controls:', err);
-		} finally {
-			loading = false;
-		}
+		// Authoritative controls already loaded via server-side load function
 	}
 
 	function openRequirementUploadModal(control: any, requirement: any) {
@@ -181,13 +168,15 @@
 				<i class="fa-solid fa-cloud-arrow-up"></i>
 				<span>SPOC Submission</span>
 			</a>
-			<a
-				href="/control-assignments/review"
-				class="px-4 py-2 rounded-lg border border-surface-200-800 bg-surface-50-950 text-surface-700-300 hover:bg-surface-200-800 text-sm font-medium transition-all flex items-center gap-2"
-			>
-				<i class="fa-solid fa-clipboard-check text-emerald-500"></i>
-				<span>Reviewer Approval</span>
-			</a>
+			{#if canReview}
+				<a
+					href="/control-assignments/review"
+					class="px-4 py-2 rounded-lg border border-surface-200-800 bg-surface-50-950 text-surface-700-300 hover:bg-surface-200-800 text-sm font-medium transition-all flex items-center gap-2"
+				>
+					<i class="fa-solid fa-clipboard-check text-emerald-500"></i>
+					<span>Reviewer Approval</span>
+				</a>
+			{/if}
 		</div>
 	</div>
 

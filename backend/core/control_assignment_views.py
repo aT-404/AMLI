@@ -89,13 +89,17 @@ class ControlAssignmentViewSet(viewsets.ModelViewSet):
         Dynamically extracts assessable controls from loaded libraries in the database.
         Not hardcoded — updates as libraries change.
         """
-        sync_control_assignments_to_audit_assignments()
         framework_id = request.query_params.get("framework_id")
         all_frameworks = list(Framework.objects.filter(requirement_nodes__assessable=True).distinct().order_by("name"))
 
         controls_qs = RequirementNode.objects.filter(assessable=True).select_related("framework")
         if framework_id:
             controls_qs = controls_qs.filter(framework_id=framework_id)
+
+        user = request.user
+        is_super_or_webadmin = bool(
+            getattr(user, "is_superuser", False) or getattr(user, "platform_role", "") in ["superadmin", "webadmin"]
+        )
 
         framework_data = []
         for fw in all_frameworks:
@@ -115,12 +119,69 @@ class ControlAssignmentViewSet(viewsets.ModelViewSet):
             domains_map = {
                 n.urn: n.name for n in RequirementNode.objects.filter(urn__in=parent_urns)
             }
+
+            fw_node_ids = [c.id for c in fw_controls]
+            assignments_qs = ControlAssignment.objects.filter(
+                requirement_node_id__in=fw_node_ids, is_active=True
+            ).select_related("spoc_user", "reviewer_user").prefetch_related("evidence_requirements")
+
+            assignments_map = {ca.requirement_node_id: ca for ca in assignments_qs}
+            ca_ids = [ca.id for ca in assignments_map.values()]
+
+            links_qs = AuditEvidenceLink.objects.filter(
+                Q(control_evidence_mapping__control_assignment_id__in=ca_ids) | Q(assessment_control__control_assignment_id__in=ca_ids),
+                is_active=True
+            ).select_related("evidence", "evidence_revision", "reviewed_by", "control_evidence_mapping", "evidence_requirement_snapshot").order_by("-created_at")
+
+            links_by_ca = {}
+            for link_obj in links_qs:
+                ca_id_val = getattr(link_obj.control_evidence_mapping, "control_assignment_id", None) or (link_obj.assessment_control.control_assignment_id if link_obj.assessment_control else None)
+                if ca_id_val:
+                    links_by_ca.setdefault(ca_id_val, []).append(link_obj)
+
             controls_list = []
             for c in fw_controls:
                 domain_name = domains_map.get(c.parent_urn, "General")
-                # Check if already assigned
-                assignment = ControlAssignment.objects.filter(requirement_node=c, is_active=True).order_by('-updated_at').first()
-                gen_link = get_active_evidence_link(assignment, None) if assignment else None
+                assignment = assignments_map.get(c.id)
+
+                if not is_super_or_webadmin:
+                    if not assignment or not assignment.spoc_user or assignment.spoc_user != user:
+                        continue
+
+                ca_links = links_by_ca.get(assignment.id, []) if assignment else []
+                gen_link = ca_links[0] if ca_links else None
+
+                req_items = []
+                if assignment:
+                    active_reqs = [r for r in assignment.evidence_requirements.all() if r.is_active]
+                    for r in active_reqs:
+                        req_link = None
+                        for l_cand in ca_links:
+                            cand_req_id = getattr(l_cand.control_evidence_mapping, "evidence_requirement_id", None) or getattr(l_cand.evidence_requirement_snapshot, "source_requirement_id", None)
+                            if cand_req_id == r.id:
+                                req_link = l_cand
+                                break
+                        req_items.append({
+                            "id": str(r.id),
+                            "name": r.name,
+                            "description": r.description,
+                            "is_mandatory": r.is_mandatory,
+                            "latest_link": (
+                                {
+                                    "id": str(req_link.id),
+                                    "title": req_link.evidence.name,
+                                    "version": str(req_link.evidence_revision.version) if req_link.evidence_revision else "1.0",
+                                    "file_url": f"/evidences/{req_link.evidence.id}/attachment" if (req_link.evidence and req_link.evidence_revision and req_link.evidence_revision.attachment) else None,
+                                    "review_status": req_link.review_status,
+                                    "reviewer_feedback": req_link.reviewer_feedback,
+                                    "reviewed_by": req_link.reviewed_by.email if req_link.reviewed_by else None,
+                                    "reviewed_at": req_link.reviewed_at.isoformat() if req_link.reviewed_at else None,
+                                }
+                                if req_link
+                                else None
+                            )
+                        })
+
                 controls_list.append({
                     "id": str(c.id),
                     "ref_id": c.ref_id,
@@ -144,29 +205,7 @@ class ControlAssignmentViewSet(viewsets.ModelViewSet):
                             "id": str(assignment.reviewer_user.id),
                             "email": assignment.reviewer_user.email,
                         } if assignment and assignment.reviewer_user else None,
-                        "evidence_requirements": [
-                            {
-                                "id": str(r.id),
-                                "name": r.name,
-                                "description": r.description,
-                                "is_mandatory": r.is_mandatory,
-                                "latest_link": (
-                                    {
-                                        "id": str(link.id),
-                                        "title": link.evidence.name,
-                                        "version": str(link.evidence_revision.version) if link.evidence_revision else "1.0",
-                                        "file_url": f"/evidences/{link.evidence.id}/attachment" if (link.evidence and link.evidence_revision and link.evidence_revision.attachment) else None,
-                                        "review_status": link.review_status,
-                                        "reviewer_feedback": link.reviewer_feedback,
-                                        "reviewed_by": link.reviewed_by.email if link.reviewed_by else None,
-                                        "reviewed_at": link.reviewed_at.isoformat() if link.reviewed_at else None,
-                                    }
-                                    if (link := get_active_evidence_link(assignment, r))
-                                    else None
-                                )
-                            }
-                            for r in (assignment.evidence_requirements.filter(is_active=True) if assignment else [])
-                        ],
+                        "evidence_requirements": req_items,
                         "latest_general_link": (
                             {
                                 "id": str(gen_link.id),
@@ -341,10 +380,39 @@ class ControlAssignmentViewSet(viewsets.ModelViewSet):
                 assignment.due_date = due_date_val
                 assignment.save(update_fields=["due_date"])
 
-            # Queue control assignment into persistent batching queue
+            # Queue control assignment into persistent batching queue & dispatch in-app notifications
             if assignment.spoc_user:
                 from core.assignment_batching import queue_control_assignment
                 queue_control_assignment(assignment)
+
+                ref_id = assignment.requirement_node.ref_id if assignment.requirement_node else "N/A"
+                ctrl_name = assignment.requirement_node.name if assignment.requirement_node else "Control"
+                NotificationService.notify(
+                    user=assignment.spoc_user,
+                    title=f"New Control Assignment: {ref_id}",
+                    message=f"You have been assigned as SPOC for control {ref_id} ({ctrl_name}) by {user.email}.",
+                    notification_type="ASSIGNMENT",
+                    link_url="/control-assignments/submit",
+                    send_email=True,
+                    related_object_type="ControlAssignment",
+                    related_object_id=str(assignment.id),
+                )
+
+            if assignment.reviewer_user and assignment.reviewer_user != assignment.spoc_user:
+                ref_id = assignment.requirement_node.ref_id if assignment.requirement_node else "N/A"
+                ctrl_name = assignment.requirement_node.name if assignment.requirement_node else "Control"
+                NotificationService.notify(
+                    user=assignment.reviewer_user,
+                    title=f"New Reviewer Assignment: {ref_id}",
+                    message=f"You have been assigned as Reviewer for control {ref_id} ({ctrl_name}) by {user.email}.",
+                    notification_type="ASSIGNMENT",
+                    link_url="/control-assignments/review",
+                    send_email=True,
+                    related_object_type="ControlAssignment",
+                    related_object_id=str(assignment.id),
+                )
+
+            sync_control_assignments_to_audit_assignments()
 
         return Response({
             "id": str(assignment.id),
@@ -447,6 +515,35 @@ class ControlAssignmentViewSet(viewsets.ModelViewSet):
                 if ca.spoc_user:
                     from core.assignment_batching import queue_control_assignment
                     queue_control_assignment(ca)
+
+                    ref_id = ca.requirement_node.ref_id if ca.requirement_node else "N/A"
+                    ctrl_name = ca.requirement_node.name if ca.requirement_node else "Control"
+                    NotificationService.notify(
+                        user=ca.spoc_user,
+                        title=f"New Control Assignment: {ref_id}",
+                        message=f"You have been assigned as SPOC for control {ref_id} ({ctrl_name}) by {user.email}.",
+                        notification_type="ASSIGNMENT",
+                        link_url="/control-assignments/submit",
+                        send_email=True,
+                        related_object_type="ControlAssignment",
+                        related_object_id=str(ca.id),
+                    )
+
+                if ca.reviewer_user and ca.reviewer_user != ca.spoc_user:
+                    ref_id = ca.requirement_node.ref_id if ca.requirement_node else "N/A"
+                    ctrl_name = ca.requirement_node.name if ca.requirement_node else "Control"
+                    NotificationService.notify(
+                        user=ca.reviewer_user,
+                        title=f"New Reviewer Assignment: {ref_id}",
+                        message=f"You have been assigned as Reviewer for control {ref_id} ({ctrl_name}) by {user.email}.",
+                        notification_type="ASSIGNMENT",
+                        link_url="/control-assignments/review",
+                        send_email=True,
+                        related_object_type="ControlAssignment",
+                        related_object_id=str(ca.id),
+                    )
+
+            sync_control_assignments_to_audit_assignments()
 
         return Response({
             "status": "success",

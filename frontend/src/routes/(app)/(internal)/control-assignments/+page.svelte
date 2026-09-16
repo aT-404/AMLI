@@ -446,11 +446,11 @@
 			No controls found for this framework.
 		</div>
 	{:else}
-		<div class="border border-surface-200-800 rounded-xl overflow-x-auto bg-surface-50-950 shadow-xs">
-			<table class="w-full text-left text-sm min-w-[1000px] table-auto">
-				<thead class="bg-surface-100-900/70 border-b border-surface-200-800 text-xs font-semibold text-surface-600-400 uppercase tracking-wider">
+		<div class="border border-surface-200-800 rounded-xl overflow-x-auto bg-surface-50-950 shadow-xs relative">
+			<table class="w-full text-left text-sm table-auto border-collapse">
+				<thead class="bg-surface-100-900 border-b border-surface-200-800 text-xs font-semibold text-surface-600-400 uppercase tracking-wider">
 					<tr>
-						<th class="p-3.5 w-12 text-center">
+						<th class="p-3.5 w-10 text-center">
 							<input
 								type="checkbox"
 								checked={selectedControlIds.length === filteredControls.length && filteredControls.length > 0}
@@ -459,17 +459,17 @@
 							/>
 						</th>
 						<th class="p-3.5 w-20">Ref ID</th>
-						<th class="p-3.5 w-56">Domain Name</th>
-						<th class="p-3.5 min-w-48">Control Name</th>
+						<th class="p-3.5 w-44">Domain Name</th>
+						<th class="p-3.5 min-w-44">Control Name</th>
 						<th class="p-3.5 w-44">Assigned SPOC (User)</th>
 						<th class="p-3.5 w-44">Assigned Reviewer (Admin)</th>
-						<th class="p-3.5 w-28 text-center">Requirements</th>
-						<th class="p-3.5 w-44 text-right pr-4">Action</th>
+						<th class="p-3.5 w-24 text-center">Requirements</th>
+						<th class="p-3.5 w-48 text-right pr-4 sticky right-0 z-20 bg-surface-100-900 border-l border-surface-200-800 shadow-md">Action</th>
 					</tr>
 				</thead>
 				<tbody class="divide-y divide-surface-200-800/50">
 					{#each filteredControls as control}
-						<tr class="hover:bg-surface-100-900/40 transition-colors">
+						<tr class="hover:bg-surface-100-900/40 transition-colors group">
 							<td class="p-3.5 text-center">
 								<input
 									type="checkbox"
@@ -478,8 +478,8 @@
 									class="rounded border-surface-300 text-primary-600 focus:ring-primary-500"
 								/>
 							</td>
-							<td class="p-3.5 font-mono text-xs font-bold text-primary-500">{control.ref_id}</td>
-							<td class="p-3.5 text-xs font-semibold text-secondary-500 max-w-56" title={control.domain_name || 'General'}>
+							<td class="p-3.5 font-mono text-xs font-bold text-primary-500 whitespace-nowrap">{control.ref_id}</td>
+							<td class="p-3.5 text-xs font-semibold text-secondary-500 max-w-44" title={control.domain_name || 'General'}>
 								<span class="inline-flex items-center gap-1.5 bg-secondary-500/10 text-secondary-400 px-2.5 py-1 rounded-md border border-secondary-500/20 max-w-full truncate">
 									<i class="fa-solid fa-folder-tree text-[10px] shrink-0"></i>
 									<span class="truncate">{control.domain_name || 'General'}</span>
@@ -488,39 +488,39 @@
 							<td class="p-3.5 font-medium text-surface-900-100 max-w-xs truncate" title={control.name}>
 								{control.name}
 							</td>
-							<td class="p-3.5">
+							<td class="p-3.5 max-w-44">
 								{#if control.assignment?.is_not_applicable}
-									<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-500/10 text-slate-400 text-xs font-semibold border border-slate-500/20">
-										<i class="fa-solid fa-ban text-[10px]"></i> Not Applicable
+									<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-slate-500/10 text-slate-400 text-xs font-semibold border border-slate-500/20 truncate">
+										<i class="fa-solid fa-ban text-[10px] shrink-0"></i> <span class="truncate">Not Applicable</span>
 									</span>
 								{:else if control.assignment?.spoc_user}
-									<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600 text-xs font-medium border border-blue-500/20">
-										<i class="fa-solid fa-user text-[10px]"></i>
-										{formatUserDisplayName(control.assignment.spoc_user)}
+									<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-500/10 text-blue-600 text-xs font-medium border border-blue-500/20 max-w-full truncate" title={formatUserDisplayName(control.assignment.spoc_user)}>
+										<i class="fa-solid fa-user text-[10px] shrink-0"></i>
+										<span class="truncate">{formatUserDisplayName(control.assignment.spoc_user)}</span>
 									</span>
 								{:else}
 									<span class="text-xs text-surface-400 italic">Unassigned</span>
 								{/if}
 							</td>
-							<td class="p-3.5">
+							<td class="p-3.5 max-w-44">
 								{#if control.assignment?.reviewer_user}
-									<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-600 text-xs font-medium border border-purple-500/20">
-										<i class="fa-solid fa-user-shield text-[10px]"></i>
-										{formatUserDisplayName(control.assignment.reviewer_user)}
+									<span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-purple-500/10 text-purple-600 text-xs font-medium border border-purple-500/20 max-w-full truncate" title={formatUserDisplayName(control.assignment.reviewer_user)}>
+										<i class="fa-solid fa-user-shield text-[10px] shrink-0"></i>
+										<span class="truncate">{formatUserDisplayName(control.assignment.reviewer_user)}</span>
 									</span>
 								{:else}
 									<span class="text-xs text-surface-400 italic">Unassigned</span>
 								{/if}
 							</td>
-							<td class="p-3.5 text-center">
+							<td class="p-3.5 text-center whitespace-nowrap">
 								<span class="px-2 py-0.5 rounded-full bg-surface-200-800 text-xs font-medium">
 									{control.assignment?.evidence_requirements?.length || 0} reqs
 								</span>
 							</td>
-							<td class="p-3.5 text-right space-x-1.5 whitespace-nowrap pr-4">
+							<td class="p-3.5 text-right space-x-1.5 whitespace-nowrap pr-4 sticky right-0 z-10 bg-surface-50-950 group-hover:bg-surface-100-900 border-l border-surface-200-800 shadow-md">
 								<button
 									onclick={() => openEditModal(control)}
-									class="px-2.5 py-1.5 rounded-lg border border-surface-200-800 bg-surface-100-900 text-xs font-medium text-surface-700-300 hover:bg-primary-500 hover:text-white hover:border-primary-500 transition-all cursor-pointer"
+									class="px-3 py-1.5 rounded-lg bg-primary-500 hover:bg-primary-600 text-white font-semibold text-xs shadow-xs transition-all cursor-pointer"
 								>
 									Assign
 								</button>

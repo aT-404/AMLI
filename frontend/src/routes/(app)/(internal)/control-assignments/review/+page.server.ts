@@ -1,7 +1,20 @@
 import { BASE_API_URL } from '$lib/utils/constants';
 import type { PageServerLoad, Actions } from './$types';
 
+import { redirect } from '@sveltejs/kit';
+
 export const load: PageServerLoad = async ({ fetch, locals }) => {
+	const user = locals.user;
+	const isAuthorizedReviewer = Boolean(
+		user?.is_superuser ||
+		user?.platform_role === 'superadmin' ||
+		user?.platform_role === 'webadmin' ||
+		user?.platform_role === 'admin'
+	);
+	if (!isAuthorizedReviewer) {
+		throw redirect(303, '/control-assignments/submit');
+	}
+
 	try {
 		const ctrlRes = await fetch(`${BASE_API_URL}/control-assignments/controls/`);
 		const repoRes = await fetch(`${BASE_API_URL}/evidence-repository/?review_status=PENDING_REVIEW`);

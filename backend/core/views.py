@@ -8210,6 +8210,105 @@ def get_audits_metrics_view(request):
 
 @api_view(["GET"])
 @permission_classes([permissions.IsAuthenticated])
+def get_user_kpis_view(request):
+    """
+    Role-aware server-side KPI aggregator for the /analytics landing page.
+    Exposes metrics strictly within the authenticated user's authorized scope.
+    """
+    user = request.user
+    today = timezone.now().date()
+    is_super_or_webadmin = bool(
+        getattr(user, "is_superuser", False) or getattr(user, "platform_role", "") in ["superadmin", "webadmin"]
+    )
+    is_admin = bool(is_super_or_webadmin or getattr(user, "platform_role", "") == "admin" or getattr(user, "is_admin", False))
+
+    # 1. Pending Tasks KPI (includes uncleared Control Assignments + TaskTemplates)
+    try:
+        from core.models import TaskTemplate, ControlAssignment, AuditEvidenceLink
+        tasks_qs = TaskTemplate.objects.filter(is_active=True).exclude(status__in=["COMPLETED", "CLOSED", "CANCELLED"])
+        if not is_super_or_webadmin:
+            direct_report_ids = list(User.objects.filter(reports_to=user).values_list("id", flat=True))
+            my_user_ids = [user.id] + direct_report_ids
+            tasks_qs = tasks_qs.filter(Q(assigned_to__in=my_user_ids) | Q(created_by=user))
+        pending_templates_count = tasks_qs.count()
+
+        ca_pending_qs = ControlAssignment.objects.filter(is_active=True, is_not_applicable=False, spoc_user__isnull=False)
+        if not is_super_or_webadmin:
+            ca_pending_qs = ca_pending_qs.filter(Q(spoc_user=user) | Q(reviewer_user=user) | Q(spoc_user__reports_to=user))
+        
+        ca_pending_ids = list(ca_pending_qs.values_list("id", flat=True))
+        cleared_ids = set(
+            AuditEvidenceLink.objects.filter(
+                is_active=True,
+                control_evidence_mapping__control_assignment_id__in=ca_pending_ids,
+                review_status__in=["APPROVED", "SUBMITTED", "PENDING_REVIEW"]
+            ).values_list('control_evidence_mapping__control_assignment_id', flat=True)
+        ) | set(
+            AuditEvidenceLink.objects.filter(
+                is_active=True,
+                assessment_control__control_assignment_id__in=ca_pending_ids,
+                review_status__in=["APPROVED", "SUBMITTED", "PENDING_REVIEW"]
+            ).values_list('assessment_control__control_assignment_id', flat=True)
+        )
+        pending_ca_count = sum(1 for cid in ca_pending_ids if cid not in cleared_ids)
+        pending_tasks_count = pending_templates_count + pending_ca_count
+    except Exception as e:
+        pending_tasks_count = 0
+
+    # 2. Overdue Control Assignments KPI
+    try:
+        from core.models import ControlAssignment
+        ca_qs = ControlAssignment.objects.filter(is_active=True, due_date__lt=today).exclude(is_not_applicable=True)
+        if not is_super_or_webadmin:
+            ca_qs = ca_qs.filter(Q(spoc_user=user) | Q(reviewer_user=user))
+        overdue_controls_count = ca_qs.count()
+    except Exception:
+        overdue_controls_count = 0
+
+    # 3. Pending Evidence Reviews KPI
+    try:
+        from core.models import AuditEvidenceLink
+        link_qs = AuditEvidenceLink.objects.filter(review_status="PENDING_REVIEW")
+        if not is_super_or_webadmin:
+            if is_admin:
+                link_qs = link_qs.filter(
+                    Q(control_evidence_mapping__control_assignment__reviewer_user=user) |
+                    Q(assessment_control__control_assignment__reviewer_user=user)
+                )
+            else:
+                link_qs = AuditEvidenceLink.objects.none()
+        pending_reviews_count = link_qs.count()
+    except Exception:
+        pending_reviews_count = 0
+
+    # 4. Intermediary Compliance Health KPI
+    try:
+        from core.models import IntermediaryFolder, IntermediaryDomainAssignment
+        if is_super_or_webadmin:
+            assigned_domains_count = IntermediaryFolder.objects.filter(folder_type=IntermediaryFolder.FolderType.DOMAIN).count()
+        else:
+            assigned_domains_count = IntermediaryDomainAssignment.objects.filter(
+                Q(spoc_users=user) | Q(approving_admins=user)
+            ).values('domain_folder').distinct().count()
+    except Exception:
+        assigned_domains_count = 0
+
+    return Response({
+        "results": {
+            "pending_tasks": pending_tasks_count,
+            "overdue_controls": overdue_controls_count,
+            "pending_reviews": pending_reviews_count,
+            "intermediary_domains": assigned_domains_count,
+            "is_admin": is_admin,
+            "is_super_or_webadmin": is_super_or_webadmin,
+            "can_access_defaulters": is_admin,
+            "can_access_reviews": is_admin or pending_reviews_count > 0,
+        }
+    })
+
+
+@api_view(["GET"])
+@permission_classes([permissions.IsAuthenticated])
 def get_combined_assessments_status_view(request):
     """
     API endpoint that returns combined assessment counts per status
